@@ -2,7 +2,7 @@ instruction_mem = []
 
 
 def load_program(instruction_mem):
-    with open('input.txt') as lines:
+    with open('input1.txt') as lines:
         for line in lines:
             instruction_mem.append(line.strip())
 
