@@ -5,7 +5,7 @@ fn main() {
     let mut file = File::open("input.txt").unwrap();
     let mut contents = String::new();
     file.read_to_string(&mut contents);
-    let mut position = (0, 0);
+    let mut position = (0, 0, 0);
     println!("Starting moving");
     for line in contents.lines() {
         println!("actual Position: {}, {}", position.0, position.1);
@@ -13,16 +13,20 @@ fn main() {
         match parse_course(line) {
             ("forward", x) => {
                 position.0 += x;
+                position.1 += x * position.2;
             }
             ("up", x) => {
-                position.1 -= x;
+                position.2 -= x;
             }
             ("down", x) => {
-                position.1 += x;
+                position.2 += x;
             }
             _ => {
                 panic!("Unknown course");
             }
+        }
+        if position.2 < 0 {
+            position.2 = 0;
         }
     }
     println!("actual Position: {}, {}", position.0, position.1);
