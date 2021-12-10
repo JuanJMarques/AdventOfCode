@@ -1,0 +1,4 @@
+[package]
+name = "day2-part1"
+version = "0.1.0"
+edition = "2018"
