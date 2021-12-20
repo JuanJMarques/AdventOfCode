@@ -22,7 +22,6 @@ fn calculate_total_paths(contents: String) -> u32 {
 }
 
 fn visit_node(neighbours: &mut HashMap<String, Vec<String>>, node: String, paths_map: &mut HashMap<String, Vec<String>>, visited_nodes: &mut Vec<String>) {
-    // println!("Visiting node: {:?}", node);
     if node == String::from("end") {
         return;
     }
@@ -30,7 +29,6 @@ fn visit_node(neighbours: &mut HashMap<String, Vec<String>>, node: String, paths
     if node.chars().nth(0).unwrap().is_lowercase() {
         visited_nodes.insert(index, node.clone());
     }
-    // if !paths_map.contains_key(&node) {
     let mut paths = Vec::new();
     for neighbour in neighbours.clone().get(&node).unwrap() {
         if !visited_nodes.contains(&neighbour) {
@@ -44,7 +42,6 @@ fn visit_node(neighbours: &mut HashMap<String, Vec<String>>, node: String, paths
             }
         }
         paths_map.insert(node.clone(), paths);
-    // }
     if node.chars().nth(0).unwrap().is_lowercase() {
         visited_nodes.remove(index);
     }
