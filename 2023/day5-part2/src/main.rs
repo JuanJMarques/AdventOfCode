@@ -18,6 +18,12 @@ struct MappingRange {
     length: u64,
 }
 
+#[derive(Copy, Clone, Debug, Eq, PartialEq)]
+struct Range {
+    init: u64,
+    end: u64,
+}
+
 fn main() {
     let lower_location = get_lower_location_number(read_input_file());
     println!("the lower location number is {}", lower_location);
@@ -86,31 +92,116 @@ fn get_lower_location_number(input: String) -> u64 {
             }
         }
     }
-    let soils = apply_mapping(seed_list, seed_to_soil);
-    let ferts = apply_mapping(soils, soil_to_fert);
-    let water = apply_mapping(ferts, fert_to_water);
-    let light = apply_mapping(water, water_to_light);
-    let temp = apply_mapping(light, light_to_temp);
-    let hum = apply_mapping(temp, temp_to_hum);
-    let locations = apply_mapping(hum, hum_to_loc);
-    *locations.iter().min().unwrap()
+    let soils = apply_mappings(seed_list, seed_to_soil);
+    let ferts = apply_mappings(soils, soil_to_fert);
+    let water = apply_mappings(ferts, fert_to_water);
+    let light = apply_mappings(water, water_to_light);
+    let temp = apply_mappings(light, light_to_temp);
+    let hum = apply_mappings(temp, temp_to_hum);
+    let locations = apply_mappings(hum, hum_to_loc);
+    *locations
+        .iter()
+        .map(|Range { init, end: _ }| init)
+        .min()
+        .unwrap()
 }
 
-fn apply_mapping(source: Vec<u64>, mappings: Vec<MappingRange>) -> Vec<u64> {
+fn apply_mappings(source: Vec<Range>, mappings: Vec<MappingRange>) -> Vec<Range> {
     let mut mapped = std::iter::repeat(false)
         .take(source.len())
         .collect::<Vec<bool>>();
     let mut destination = source.to_vec();
     for mapping in mappings {
-        for (i, &item) in source.iter().enumerate() {
-            if !mapped[i] && mapping.source <= item && item < mapping.source + mapping.length {
-                let shift = item - mapping.source;
-                destination[i] = mapping.destination + shift;
-                mapped[i] = true;
+        (destination, mapped) = apply_mapping(destination.clone(), mapping, mapped.clone());
+    }
+    destination.clone()
+}
+
+fn apply_mapping(
+    source: Vec<Range>,
+    mapping: MappingRange,
+    mapped: Vec<bool>,
+) -> (Vec<Range>, Vec<bool>) {
+    let mut destination = vec![];
+    let mut new_mapped = vec![];
+    let MappingRange {
+        source: init,
+        destination: dest,
+        length,
+    } = mapping;
+    let end = init + length - 1;
+    for (i, &Range { init: a, end: b }) in source.iter().enumerate() {
+        if !mapped[i] {
+            let inner_dif = b - a;
+            if b < init {
+                destination.push(Range { init: a, end: b });
+                new_mapped.push(false);
             }
+            if init <= a {
+                let diff = a - init;
+                if end < a {
+                    destination.push(Range { init: a, end: b });
+                    new_mapped.push(false);
+                }
+                if b <= end {
+                    destination.push(Range {
+                        init: dest + diff,
+                        end: dest + diff + inner_dif,
+                    });
+                    new_mapped.push(true);
+                }
+                if a <= end && end < b {
+                    let inner_dif = end - a;
+                    destination.push(Range {
+                        init: dest + diff,
+                        end: dest + diff + inner_dif,
+                    });
+                    new_mapped.push(true);
+                    destination.push(Range {
+                        init: end + 1,
+                        end: b,
+                    });
+                    new_mapped.push(false);
+                }
+            }
+            if a < init && init <= b {
+                if b <= end {
+                    destination.push(Range {
+                        init: a,
+                        end: init - 1,
+                    });
+                    new_mapped.push(false);
+                    let inner_dif = b - init;
+                    destination.push(Range {
+                        init: dest,
+                        end: dest + inner_dif,
+                    });
+                    new_mapped.push(true);
+                } else {
+                    destination.push(Range {
+                        init: a,
+                        end: init - 1,
+                    });
+                    new_mapped.push(false);
+                    let inner_dif = b - end;
+                    destination.push(Range {
+                        init: dest,
+                        end: dest + inner_dif,
+                    });
+                    new_mapped.push(true);
+                    destination.push(Range {
+                        init: end + 1,
+                        end: b,
+                    });
+                    new_mapped.push(false);
+                }
+            }
+        } else {
+            destination.push(Range { init: a, end: b });
+            new_mapped.push(true);
         }
     }
-    destination
+    (destination, new_mapped)
 }
 
 fn parse_mapping_range(line: &str) -> MappingRange {
@@ -127,7 +218,7 @@ fn parse_mapping_range(line: &str) -> MappingRange {
     }
 }
 
-fn get_seeds_list(line: &str) -> Vec<u64> {
+fn get_seeds_list(line: &str) -> Vec<Range> {
     let x = line.split(':').collect::<Vec<&str>>()[1]
         .split(' ')
         .map(|s| s.trim())
@@ -137,8 +228,11 @@ fn get_seeds_list(line: &str) -> Vec<u64> {
     let mut i = 0;
     let mut seeds = vec![];
     while i < x.len() {
-        let range = (x[i]..(x[i] + x[i + 1])).collect::<Vec<u64>>();
-        seeds.extend(range);
+        let range = Range {
+            init: x[i],
+            end: x[i] + x[i + 1] - 1,
+        };
+        seeds.push(range);
         i += 2
     }
     seeds
@@ -164,11 +258,71 @@ mod tests {
     #[test]
     fn test_parse_seeds() {
         let seeds = get_seeds_list("seeds: 79 14 55 13");
-        assert_eq!(seeds.len(), 4);
-        assert_eq!(seeds[0], 79);
-        assert_eq!(seeds[1], 14);
-        assert_eq!(seeds[2], 55);
-        assert_eq!(seeds[3], 13);
+        assert_eq!(seeds.len(), 2);
+        assert_eq!(seeds[0].init, 79);
+        assert_eq!(seeds[0].end, 79 + 13);
+        assert_eq!(seeds[1].init, 55);
+        assert_eq!(seeds[1].end, 55 + 12);
+    }
+
+    #[test]
+    fn test_apply_mapping() {
+        let original = vec![Range { init: 10, end: 20 }];
+        let mapping = MappingRange {
+            source: 0,
+            destination: 21,
+            length: 10,
+        };
+        let (mapped, applied) = apply_mapping(original.clone(), mapping, vec![false]);
+        assert_eq!(1, mapped.len());
+        assert_eq!(1, applied.len());
+        assert!(!applied[0]);
+        assert_eq!(original.clone(), mapped);
+        let mapping = MappingRange {
+            source: 0,
+            destination: 21,
+            length: 11,
+        };
+        let (mapped, applied) = apply_mapping(original.clone(), mapping, vec![false]);
+        assert_eq!(2, mapped.len());
+        assert_eq!(2, applied.len());
+        assert!(applied[0]);
+        assert!(!applied[1]);
+        assert_eq!(mapped[0], Range { init: 31, end: 31 });
+        assert_eq!(mapped[1], Range { init: 11, end: 20 });
+        let mapping = MappingRange {
+            source: 0,
+            destination: 21,
+            length: 15,
+        };
+        let (mapped, applied) = apply_mapping(original.clone(), mapping, vec![false]);
+        assert_eq!(2, mapped.len());
+        assert_eq!(2, applied.len());
+        assert!(applied[0]);
+        assert!(!applied[1]);
+        assert_eq!(mapped[0], Range { init: 31, end: 35 });
+        assert_eq!(mapped[1], Range { init: 15, end: 20 });
+        let mapping = MappingRange {
+            source: 0,
+            destination: 21,
+            length: 1000,
+        };
+        let (mapped, applied) = apply_mapping(original.clone(), mapping, vec![false]);
+        assert_eq!(1, mapped.len());
+        assert!(applied[0]);
+        assert_eq!(mapped[0], Range { init: 31, end: 41 });
+        let mapping = MappingRange {
+            source: 15,
+            destination: 21,
+            length: 1000,
+        };
+        let (mapped, applied) = apply_mapping(original.clone(), mapping, vec![false]);
+        assert_eq!(2, mapped.len());
+        assert_eq!(2, applied.len());
+        assert!(!applied[0]);
+        assert!(applied[1]);
+        assert_eq!(mapped[0], Range { init: 10, end: 14 });
+        assert_eq!(mapped[1], Range { init: 15, end: 26 });
     }
 
     #[test]
