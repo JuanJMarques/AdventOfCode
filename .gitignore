@@ -240,3 +240,6 @@ Cargo.lock
 **/*.rs.bk
 
 scratches
+
+# Zig caches
+.zig-cache
